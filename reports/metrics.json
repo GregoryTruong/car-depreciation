@@ -1,0 +1,36 @@
+{
+  "train_size": 13175,
+  "test_size": 3294,
+  "results": [
+    {
+      "model": "Median guess",
+      "average_error_dollars": 13862,
+      "median_error_percent": 38.4,
+      "r2": -0.05,
+      "within_kbb_range_percent": 7.8
+    },
+    {
+      "model": "Linear regression",
+      "average_error_dollars": 4371,
+      "median_error_percent": 9.9,
+      "r2": 0.839,
+      "within_kbb_range_percent": 29.9
+    },
+    {
+      "model": "Gradient boosting",
+      "average_error_dollars": 3532,
+      "median_error_percent": 7.7,
+      "r2": 0.887,
+      "within_kbb_range_percent": 36.8
+    }
+  ],
+  "feature_importance": {
+    "model": 0.7186,
+    "age": 0.3391,
+    "mileage": 0.3006,
+    "make": 0.0818,
+    "drivetrain": 0.0574,
+    "body": 0.021,
+    "fuel": 0.021
+  }
+}
