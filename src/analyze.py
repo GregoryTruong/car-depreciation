@@ -59,6 +59,11 @@ def model_retention(listings, bundle, yearly_miles, min_listings=MIN_LISTINGS) -
     return pd.DataFrame(rows).sort_values("kept_1_to_5", ascending=False)
 
 
+def years(n: int) -> str:
+    """'1 yr' or '3 yrs'."""
+    return f"{n} yr" if n == 1 else f"{n} yrs"
+
+
 def save(fig, name):
     fig.tight_layout()
     fig.savefig(FIGURES_DIR / name)
@@ -175,7 +180,7 @@ def main():
         "| Car | New price | Sweet spot | Value at 5 yrs | Cost/yr buying new* | "
         "Cost/yr at sweet spot* |",
         "|---|---|---|---|---|---|",
-        *[f"| {r.car} | ${r.new_price:,.0f} | {r.sweet_spot} yr{"s" if r.sweet_spot != 1 else ""} | {r.kept_at_5:.0f}% | "
+        *[f"| {r.car} | ${r.new_price:,.0f} | {years(r.sweet_spot)} | {r.kept_at_5:.0f}% | "
           f"${r.cost_new:,.0f} | ${r.cost_spot:,.0f} |" for r in examples.itertuples()],
         "\n_*Average value lost per year when keeping the car for 3 years._\n",
         "![Depreciation curves](figures/example_curves.png)\n",

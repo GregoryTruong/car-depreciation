@@ -9,7 +9,8 @@ import pandas as pd
 from src.config import LISTINGS_FILE, MODEL_FILE, NEW_PRICES_FILE
 from src.features import prepare_features
 
-AGES = range(1, 11)  # 1 to 10 years old (age 0 is the new price)
+MAX_AGE = 10
+AGES = range(1, MAX_AGE + 1)  # 1 to 10 years old (age 0 is the new price)
 
 
 def load_data():
