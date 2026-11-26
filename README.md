@@ -1,5 +1,7 @@
 # Car Depreciation Analyzer
 
+[![tests](https://github.com/GregoryTruong/car-depreciation/actions/workflows/tests.yml/badge.svg)](https://github.com/GregoryTruong/car-depreciation/actions/workflows/tests.yml)
+
 **When is the smartest time to buy a used car?**
 
 Sites like AutoTrader tell you whether *one listing* is a fair price. They don't tell you
@@ -90,6 +92,8 @@ Keeping it 3 years, average value lost per year:
 Options: `--hold 5` (years you'll keep it), `--miles 15000` (miles you drive per year).
 
 ## Run the pipeline
+
+Needs Python 3.11 or newer.
 
 ```bash
 python3 -m venv .venv
