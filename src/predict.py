@@ -8,6 +8,7 @@ Optional:
 import argparse
 
 from src.depreciation import (
+    MAX_AGE,
     find_model,
     load_data,
     miles_per_year,
@@ -21,6 +22,10 @@ from src.depreciation import (
 )
 
 
+def years_old(age: int) -> str:
+    return "1 year old" if age == 1 else f"{age} years old"
+
+
 def main():
     parser = argparse.ArgumentParser(description="Depreciation curve and best age to buy a car.")
     parser.add_argument("make", help='e.g. Toyota (use quotes for two words: "Land Rover")')
@@ -28,6 +33,10 @@ def main():
     parser.add_argument("--hold", type=int, default=3, help="years you plan to keep it")
     parser.add_argument("--miles", type=float, help="miles you drive per year")
     args = parser.parse_args()
+    if args.hold < 1:
+        parser.error("--hold must be at least 1 year")
+    if args.miles is not None and args.miles <= 0:
+        parser.error("--miles must be more than 0")
 
     listings, new_prices, bundle = load_data()
     try:
@@ -35,14 +44,14 @@ def main():
     except ValueError as error:
         parser.exit(1, f"{error}\n")
 
-    yearly_miles = args.miles or miles_per_year(listings)
+    yearly_miles = args.miles if args.miles is not None else miles_per_year(listings)
     specs = typical_specs(listings, make, model)
     curve = value_curve(bundle, specs, yearly_miles)
     new_price, source = new_price_for(new_prices, curve, make, model,
                                       typical_first_year_value(listings, new_prices))
     values = with_new_price(curve, new_price)
     spot = sweet_spot(values)
-    hold = max(1, min(args.hold, 10 - spot))  # the curve only goes to 10 years
+    hold = min(args.hold, MAX_AGE - spot)  # the curve only goes to MAX_AGE years
     n_listings = ((listings["make"] == make) & (listings["model"] == model)).sum()
 
     print(f"\n{make} {model}  ({specs['body']}, {specs['drivetrain']}, {specs['fuel']})")
@@ -58,9 +67,13 @@ def main():
 
     cost_new = ownership_cost(values, 0, hold)
     cost_spot = ownership_cost(values, spot, hold)
-    print(f"\nKeeping it {hold} years, average value lost per year:")
-    print(f"  Buy new:            ${cost_new:,.0f}/yr")
-    print(f"  Buy {spot} years old:    ${cost_spot:,.0f}/yr  (saves ${cost_new - cost_spot:,.0f}/yr)")
+    if hold < args.hold:
+        print(f"\nNote: the curve stops at {MAX_AGE} years, so a car bought "
+              f"{years_old(spot)} can only be followed for {hold} more.")
+    print(f"\nKeeping it {hold} year{'s' if hold != 1 else ''}, average value lost per year:")
+    buy_spot = f"Buy {years_old(spot)}:"
+    print(f"  {'Buy new:':<20}${cost_new:,.0f}/yr")
+    print(f"  {buy_spot:<20}${cost_spot:,.0f}/yr  (saves ${cost_new - cost_spot:,.0f}/yr)")
     if n_listings < 40:
         print("\nNote: fewer than 40 listings for this model, so treat the curve as rough.")
 
