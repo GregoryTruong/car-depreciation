@@ -7,13 +7,14 @@ from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder
 
-CATEGORICAL = ["make", "model", "body", "drivetrain", "fuel"]
+CATEGORICAL = ["make", "model", "trim", "body", "drivetrain", "fuel"]
 NUMERIC = ["age", "mileage"]
 FEATURES = CATEGORICAL + NUMERIC
 
 # The model can handle at most 255 different values per category, so the
-# 250 most common models keep their name and rarer ones become "Other".
+# 250 most common models (and trims) keep their name and rarer ones become "Other".
 MAX_MODELS = 250
+MAX_TRIMS = 250
 
 
 def most_common_models(cars: pd.DataFrame) -> set[str]:
@@ -21,11 +22,25 @@ def most_common_models(cars: pd.DataFrame) -> set[str]:
     return set(counts.index[:MAX_MODELS])
 
 
-def prepare_features(cars: pd.DataFrame, known_models: set[str]) -> pd.DataFrame:
-    """Select the model's input columns and replace rare car models with "Other"."""
+def most_common_trims(cars: pd.DataFrame) -> set[str]:
+    """Trim names are shared across models on purpose: "Limited" or "Platinum" means a
+    well-equipped car at Toyota, Ford or Jeep, so the model can learn from all of them.
+    (Tested: this beat treating every model + trim pair separately.)
+    """
+    return set(cars["trim"].value_counts().index[:MAX_TRIMS])
+
+
+def prepare_features(cars: pd.DataFrame, known_models: set[str],
+                     known_trims: set[str]) -> pd.DataFrame:
+    """Select the model's input columns and replace rare models and trims with "Other".
+
+    A missing trim stays missing (the model treats it as its own category).
+    """
     features = cars[FEATURES].copy()
     full_name = cars["make"] + " " + cars["model"]
     features.loc[~full_name.isin(known_models), "model"] = "Other"
+    rare_trim = features["trim"].notna() & ~features["trim"].isin(known_trims)
+    features.loc[rare_trim, "trim"] = "Other"
     return features
 
 

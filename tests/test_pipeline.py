@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from src.clean import car_age, remove_bad_rows, simplify_drivetrain, simplify_fuel
+from src.clean import car_age, remove_bad_rows, simplify_drivetrain, simplify_fuel, simplify_trim
 from src.depreciation import ownership_cost, sweet_spot
 from src.features import prepare_features
 
@@ -30,6 +30,15 @@ def test_fuel_labels_from_both_sources_match(raw, expected):
     assert simplify_fuel(raw) == expected
 
 
+@pytest.mark.parametrize("raw, expected", [
+    ("XLE", "XLE"), ("XLE AWD", "XLE"), ("SE Sedan 4D", "SE"), ("4MATIC Coupe", None),
+    ("AWD 2.5 S", "2.5 S"), ("SH-AWD", "SH"), ("Unlimited Rubicon 4xe", "Unlimited Rubicon 4xe"),
+    ("xDrive40i", "xDrive40i"), ("FWD", None), (None, None),
+])
+def test_trim_drops_drivetrain_and_body_words(raw, expected):
+    assert simplify_trim(raw) == expected
+
+
 def test_remove_bad_rows_drops_impossible_cars():
     cars = pd.DataFrame({
         "value": [25_000, 0, 25_000, 25_000, 900_000],
@@ -42,13 +51,18 @@ def test_remove_bad_rows_drops_impossible_cars():
     assert len(kept) == 1  # only the first car is realistic
 
 
-def test_rare_models_become_other():
+def test_rare_models_and_trims_become_other():
     cars = pd.DataFrame({
-        "make": ["Toyota", "Lotus"], "model": ["Camry", "Emira"], "body": ["Sedan", "Coupe"],
-        "drivetrain": ["FWD", "RWD"], "fuel": ["Gas", "Gas"], "age": [3, 2], "mileage": [30e3, 5e3],
+        "make": ["Toyota", "Lotus", "Toyota"], "model": ["Camry", "Emira", "Camry"],
+        "trim": ["SE", "First Edition", None], "body": ["Sedan", "Coupe", "Sedan"],
+        "drivetrain": ["FWD", "RWD", "FWD"], "fuel": ["Gas", "Gas", "Gas"],
+        "age": [3, 2, 4], "mileage": [30e3, 5e3, 40e3],
     })
-    features = prepare_features(cars, known_models={"Toyota Camry"})
-    assert features["model"].tolist() == ["Camry", "Other"]
+    features = prepare_features(cars, known_models={"Toyota Camry"}, known_trims={"SE"})
+    assert features["model"].tolist() == ["Camry", "Other", "Camry"]
+    # A missing trim stays missing instead of being lumped in with rare trims.
+    assert features["trim"].tolist()[:2] == ["SE", "Other"]
+    assert pd.isna(features["trim"].iloc[2])
 
 
 def test_sweet_spot_is_after_the_steep_early_drop():

@@ -11,6 +11,7 @@ import pytest
 from src.depreciation import (
     MAX_AGE,
     find_model,
+    find_trim,
     miles_per_year,
     new_price_for,
     typical_first_year_value,
@@ -22,6 +23,7 @@ from src.depreciation import (
 LISTINGS = pd.DataFrame({
     "make": ["Toyota", "Toyota", "Toyota", "Toyota", "Honda", "Honda"],
     "model": ["RAV4", "RAV4", "RAV4", "Camry", "Civic", "Civic"],
+    "trim": ["XLE", "XLE", "Limited", "SE", None, "EX"],
     "body": ["SUV", "SUV", "Sedan", "Sedan", "Sedan", "Sedan"],
     "drivetrain": ["AWD/4WD", "AWD/4WD", "FWD", "FWD", "FWD", "FWD"],
     "fuel": ["Gas", "Hybrid", "Gas", "Gas", "Gas", "Gas"],
@@ -38,7 +40,7 @@ class FakeModel:
         return 40_000 * 0.9 ** features["age"].to_numpy()
 
 
-BUNDLE = {"model": FakeModel(), "known_models": {"Toyota RAV4"}}
+BUNDLE = {"model": FakeModel(), "known_models": {"Toyota RAV4"}, "known_trims": {"XLE"}}
 
 
 def test_find_model_ignores_capitalization():
@@ -57,8 +59,27 @@ def test_find_model_suggests_close_spellings():
 
 def test_typical_specs_uses_the_most_common_values():
     specs = typical_specs(LISTINGS, "Toyota", "RAV4")
-    assert specs == {"make": "Toyota", "model": "RAV4", "body": "SUV",
+    assert specs == {"make": "Toyota", "model": "RAV4", "trim": "XLE", "body": "SUV",
                      "drivetrain": "AWD/4WD", "fuel": "Gas"}
+
+
+def test_typical_specs_for_a_chosen_trim_describe_that_trim():
+    specs = typical_specs(LISTINGS, "Toyota", "RAV4", trim="Limited")
+    assert (specs["trim"], specs["body"], specs["drivetrain"]) == ("Limited", "Sedan", "FWD")
+
+
+def test_typical_specs_work_when_no_trim_is_recorded():
+    listings = LISTINGS.assign(trim=None)
+    assert typical_specs(listings, "Honda", "Civic")["trim"] is None
+
+
+def test_find_trim_ignores_capitalization():
+    assert find_trim(LISTINGS, "Toyota", "RAV4", "xle") == "XLE"
+
+
+def test_find_trim_lists_the_trims_it_does_have():
+    with pytest.raises(ValueError, match=r"XLE \(2\), Limited \(1\)"):
+        find_trim(LISTINGS, "Toyota", "RAV4", "TRD Pro")
 
 
 def test_miles_per_year_skips_brand_new_cars():
@@ -81,26 +102,34 @@ def test_value_curve_smoothing_keeps_a_steady_percentage_decline():
 
 
 def test_new_price_comes_from_new_listings_when_available():
-    new_prices = pd.DataFrame({"make": ["Toyota"], "model": ["RAV4"], "new_price": [36_000]})
+    new_prices = pd.DataFrame({"make": ["Toyota"], "model": ["RAV4"], "trim": ["XLE"],
+                               "new_price": [36_000]})
     curve = pd.DataFrame({"age": [1, 2], "value": [30_000, 27_000]})
-    price, source = new_price_for(new_prices, curve, "Toyota", "RAV4", first_year_share=0.8)
+    specs = {"make": "Toyota", "model": "RAV4", "trim": "XLE"}
+    price, source = new_price_for(new_prices, curve, specs, first_year_share=0.8)
     assert price == 36_000
     assert "MSRP" in source
 
 
 def test_new_price_is_estimated_when_there_are_no_new_listings():
-    new_prices = pd.DataFrame({"make": ["Toyota"], "model": ["RAV4"], "new_price": [36_000]})
+    # There's an MSRP for the RAV4 XLE, but not for the Limited, so it gets estimated.
+    new_prices = pd.DataFrame({"make": ["Toyota"], "model": ["RAV4"], "trim": ["XLE"],
+                               "new_price": [36_000]})
     curve = pd.DataFrame({"age": [1, 2], "value": [24_000, 21_000]})
-    price, source = new_price_for(new_prices, curve, "Honda", "Civic", first_year_share=0.8)
+    specs = {"make": "Toyota", "model": "RAV4", "trim": "Limited"}
+    price, source = new_price_for(new_prices, curve, specs, first_year_share=0.8)
     assert price == pytest.approx(30_000)  # $24,000 at age 1 is 80% of $30,000
     assert "estimated" in source
 
 
 def test_typical_first_year_value_compares_nearly_new_cars_to_msrp():
     new_prices = pd.DataFrame({"make": ["Toyota", "Honda"], "model": ["Camry", "Civic"],
-                               "new_price": [30_000, 30_000]})
-    # Camry at age 0: $30k of $30k = 100%. Civic at age 1: $24k of $30k = 80%.
-    assert typical_first_year_value(LISTINGS, new_prices) == pytest.approx(0.9)
+                               "trim": ["SE", "EX"], "new_price": [30_000, 30_000]})
+    # Camry SE at age 0: $30k of $30k = 100%. The 1-year-old Civic has no trim, so
+    # there's no MSRP to compare it to, and the 3-year-old Civic EX is too old.
+    # Add a 1-year-old Civic EX worth $24k of $30k = 80%.
+    listings = pd.concat([LISTINGS, LISTINGS.iloc[[4]].assign(trim="EX")])
+    assert typical_first_year_value(listings, new_prices) == pytest.approx(0.9)
 
 
 def test_with_new_price_puts_the_msrp_at_age_zero():

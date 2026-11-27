@@ -4,6 +4,8 @@ Both datasets describe cars differently ("All wheel drive" vs "4WD", "TRUCKS" vs
 "Pickup"), so this step puts them into the same columns with the same labels.
 """
 
+import re
+
 import pandas as pd
 
 from src.config import (
@@ -45,6 +47,24 @@ def simplify_drivetrain(value) -> str | None:
     return None
 
 
+# Words that describe drivetrain or body style, which already have their own columns.
+# "RAV4 XLE AWD" and "RAV4 XLE" are the same trim; "Camry SE Sedan 4D" is just "SE".
+NOT_TRIM = re.compile(
+    r"\b(awd|4wd|fwd|rwd|2wd|4x4|4x2|4matic|sedan|hatchback|coupe|wagon|convertible"
+    r"|cabriolet|suv|[24]d)\b",
+    flags=re.IGNORECASE,
+)
+
+
+def simplify_trim(value) -> str | None:
+    """Trim name without drivetrain or body words ("XLE AWD" -> "XLE"). None if nothing is left."""
+    if not isinstance(value, str):
+        return None
+    text = NOT_TRIM.sub(" ", value)
+    text = re.sub(r"\s+", " ", text).strip(" -")
+    return text or None
+
+
 def simplify_fuel(value) -> str:
     """Group fuel types into Gas, Hybrid, Plug-in Hybrid and Electric."""
     if not isinstance(value, str):
@@ -60,13 +80,15 @@ def simplify_fuel(value) -> str:
 
 
 def clean_autotrader(raw: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Return (used car values, new car prices)."""
+    """Return (used car values, new car prices per trim)."""
     raw = raw.drop_duplicates("listingId")
 
-    # --- New cars: their MSRP tells us what each model costs brand new.
+    # --- New cars: their MSRP tells us what each trim costs brand new. Prices are kept
+    # per trim because a top trim can cost twice the base one (F150 XL vs. Raptor).
     new = raw[(raw["listingType"] == "New") & (raw["msrp"] > 0)]
     new_prices = (
-        new.groupby(["makeName", "modelName"])["msrp"]
+        new.assign(trim=new["trim"].map(simplify_trim))
+        .groupby(["makeName", "modelName", "trim"])["msrp"]
         .agg(new_price="median", new_listings="count")
         .reset_index()
         .rename(columns={"makeName": "make", "modelName": "model"})
@@ -78,7 +100,7 @@ def clean_autotrader(raw: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     used = pd.DataFrame({
         "make": used["makeName"],
         "model": used["modelName"],
-        "trim": used["trim"],
+        "trim": used["trim"].map(simplify_trim),
         "year": used["year"].astype(int),
         "age": car_age(used["year"]).astype(int),
         "mileage": used["mileage"],
@@ -100,6 +122,7 @@ def clean_marketcheck(raw: pd.DataFrame) -> pd.DataFrame:
     dealer = pd.DataFrame({
         "make": raw["neo_make"],
         "model": raw["neo_model"],
+        "trim": raw["neo_trim"].map(simplify_trim),
         "year": raw["neo_year"].astype(int),
         "age": car_age(raw["neo_year"]).astype(int),
         "mileage": raw["miles"],
@@ -135,7 +158,7 @@ def main():
     used.to_parquet(LISTINGS_FILE)
     new_prices.to_parquet(NEW_PRICES_FILE)
     print(f"AutoTrader: {len(raw):,} listings -> kept {len(used):,} used cars with a KBB value")
-    print(f"            new-car prices for {len(new_prices):,} models")
+    print(f"            new-car prices for {len(new_prices):,} trims")
 
     raw_dealer = pd.read_csv(RAW_DIR / "marketcheck.csv", low_memory=False)
     dealer = clean_marketcheck(raw_dealer)
