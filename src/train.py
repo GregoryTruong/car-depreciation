@@ -14,6 +14,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer, TransformedTargetRegressor
+from sklearn.impute import SimpleImputer
 from sklearn.inspection import permutation_importance
 from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_absolute_error, r2_score
@@ -22,7 +23,14 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from src.config import LISTINGS_FILE, METRICS_FILE, MODEL_FILE, MODELS_DIR, REPORTS_DIR
-from src.features import CATEGORICAL, NUMERIC, build_model, most_common_models, prepare_features
+from src.features import (
+    CATEGORICAL,
+    NUMERIC,
+    build_model,
+    most_common_models,
+    most_common_trims,
+    prepare_features,
+)
 
 
 def score(name: str, actual: pd.Series, predicted: np.ndarray, test: pd.DataFrame) -> dict:
@@ -40,7 +48,11 @@ def score(name: str, actual: pd.Series, predicted: np.ndarray, test: pd.DataFram
 
 def linear_baseline() -> TransformedTargetRegressor:
     encoder = ColumnTransformer([
-        ("categories", OneHotEncoder(handle_unknown="ignore"), CATEGORICAL),
+        # Missing trims become the text "missing" so the encoder can handle them.
+        ("categories", Pipeline([
+            ("fill", SimpleImputer(strategy="constant", fill_value="missing")),
+            ("onehot", OneHotEncoder(handle_unknown="ignore")),
+        ]), CATEGORICAL),
         ("numbers", StandardScaler(), NUMERIC),
     ])
     return TransformedTargetRegressor(
@@ -52,7 +64,8 @@ def linear_baseline() -> TransformedTargetRegressor:
 def main():
     cars = pd.read_parquet(LISTINGS_FILE)
     known_models = most_common_models(cars)
-    X = prepare_features(cars, known_models)
+    known_trims = most_common_trims(cars)
+    X = prepare_features(cars, known_models, known_trims)
     y = cars["value"]
 
     # random_state=42 makes the split the same every run, so results are repeatable.
@@ -85,7 +98,8 @@ def main():
     # Retrain on ALL the data for the final model now that we know it works.
     final_model = build_model().fit(X, y)
     MODELS_DIR.mkdir(exist_ok=True)
-    joblib.dump({"model": final_model, "known_models": known_models}, MODEL_FILE)
+    joblib.dump({"model": final_model, "known_models": known_models,
+                 "known_trims": known_trims}, MODEL_FILE)
 
     REPORTS_DIR.mkdir(exist_ok=True)
     METRICS_FILE.write_text(json.dumps({

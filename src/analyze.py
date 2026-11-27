@@ -21,13 +21,13 @@ from src.depreciation import (
     miles_per_year,
     new_price_for,
     ownership_cost,
+    predict_values,
     sweet_spot,
     typical_first_year_value,
     typical_specs,
     value_curve,
     with_new_price,
 )
-from src.features import prepare_features
 
 # Only rank models with enough listings to trust their curve.
 MIN_LISTINGS = 40
@@ -76,7 +76,7 @@ def chart_examples(listings, new_prices, bundle, yearly_miles, first_year_share)
     for i, (make, model) in enumerate(EXAMPLES):
         specs = typical_specs(listings, make, model)
         curve = value_curve(bundle, specs, yearly_miles)
-        new_price, _ = new_price_for(new_prices, curve, make, model, first_year_share)
+        new_price, _ = new_price_for(new_prices, curve, specs, first_year_share)
         values = with_new_price(curve, new_price)
         spot = sweet_spot(values)
         share = values / new_price * 100
@@ -123,7 +123,7 @@ def chart_groups(retention, column, filename, title, min_models=3):
 def reality_check(bundle):
     """Compare model estimates with real dealer asking prices (a separate dataset)."""
     dealer = pd.read_parquet(DEALER_PRICES_FILE)
-    dealer["estimate"] = bundle["model"].predict(prepare_features(dealer, bundle["known_models"]))
+    dealer["estimate"] = predict_values(bundle, dealer)
     dealer["known_model"] = (dealer["make"] + " " + dealer["model"]).isin(bundle["known_models"])
     dealer["ratio"] = dealer["price"] / dealer["estimate"]
 
