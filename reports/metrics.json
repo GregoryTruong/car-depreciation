@@ -11,26 +11,27 @@
     },
     {
       "model": "Linear regression",
-      "average_error_dollars": 4371,
-      "median_error_percent": 9.9,
-      "r2": 0.839,
-      "within_kbb_range_percent": 29.9
+      "average_error_dollars": 3433,
+      "median_error_percent": 7.9,
+      "r2": 0.892,
+      "within_kbb_range_percent": 35.6
     },
     {
       "model": "Gradient boosting",
-      "average_error_dollars": 3532,
-      "median_error_percent": 7.7,
-      "r2": 0.887,
-      "within_kbb_range_percent": 36.8
+      "average_error_dollars": 2542,
+      "median_error_percent": 5.6,
+      "r2": 0.931,
+      "within_kbb_range_percent": 47.2
     }
   ],
   "feature_importance": {
-    "model": 0.7186,
-    "age": 0.3391,
-    "mileage": 0.3006,
-    "make": 0.0818,
-    "drivetrain": 0.0574,
-    "body": 0.021,
-    "fuel": 0.021
+    "model": 0.5727,
+    "age": 0.3221,
+    "mileage": 0.2857,
+    "trim": 0.1316,
+    "make": 0.0642,
+    "drivetrain": 0.0365,
+    "fuel": 0.0235,
+    "body": 0.0088
   }
 }

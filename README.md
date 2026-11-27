@@ -20,11 +20,12 @@ command-line tool to look up any car.
 - **Buying at the sweet spot cut the yearly cost of ownership roughly in half** for 5 of
   the 6 example models. For a
   Toyota Camry kept 3 years, you'd lose about $4,500/year buying new vs. about
-  $2,200/year buying it 2 years old.
-- **Toyota and Honda hold value best.** Tacoma, Corolla and Accord keep about 75% of
-  their value from year 1 to year 5. **Luxury SUVs lose the most**: a BMW X5 keeps 46%.
-- **Electric cars depreciate a bit faster than gas cars** (60% vs. 62% kept from year 1
-  to 5). Only 14 electric models had enough data, so this one is a weaker signal.
+  $2,400/year buying it 2 years old.
+- **Toyota holds value best.** Tacoma, Corolla and 4Runner keep 75-78% of their
+  value from year 1 to year 5. **Luxury SUVs lose the most**: a Porsche Macan or Cayenne
+  keeps 46%.
+- **Electric cars depreciate about the same as gas cars** (61% vs. 62% kept from year 1
+  to 5). Only 14 electric models had enough data, so this is a weak signal either way.
 
 ![Depreciation curves](reports/figures/example_curves.png)
 
@@ -35,25 +36,35 @@ Full results with all charts: [reports/findings.md](reports/findings.md)
 ## The model
 
 A **gradient boosting** model (scikit-learn `HistGradientBoostingRegressor`) predicts a
-car's market value from its make, model, body style, drivetrain, fuel type, age and mileage.
-Tested on 3,294 cars it never saw during training:
+car's market value from its make, model, trim, body style, drivetrain, fuel type, age and
+mileage. Tested on 3,294 cars it never saw during training:
 
 | Model | Avg error | Median error | R² |
 |---|---|---|---|
 | Median guess (baseline) | $13,862 | 38.4% | -0.05 |
-| Linear regression (baseline) | $4,371 | 9.9% | 0.84 |
-| **Gradient boosting** | **$3,532** | **7.7%** | **0.89** |
+| Linear regression (baseline) | $3,433 | 7.9% | 0.89 |
+| **Gradient boosting** | **$2,542** | **5.6%** | **0.93** |
+
+Adding **trim level** (a base Camry LE vs. a sporty XSE, or an F150 XL vs. a Raptor) cut the
+average error by 28%, from $3,532 to $2,542, and put 47% of estimates inside Kelley Blue
+Book's fair price range, up from 37%.
 
 Design choices:
 - **Predicts log(value)** so errors are measured as percentages, not dollars. A $2,000
   miss matters more on a $10,000 car than on an $80,000 one.
+- **Trim names are shared across brands.** "Limited" or "Platinum" means a well-equipped
+  car at Toyota, Ford or Jeep, so the model learns from all of them. In a side-by-side test
+  this beat treating every model + trim pair as its own category ($2,508 vs. $2,950 average
+  error). Drivetrain and body words are stripped first, so "XLE AWD" and "XLE" are the same
+  trim.
 - **Monotonic constraints:** value can only go *down* as age and mileage go up. Without
   this, noise could make a 6-year-old car "worth more" than a 5-year-old one.
 - **Smoothed curves:** each model's predictions are fit with a constant-percentage
   decline, so random bumps don't decide the sweet spot.
 
 **What matters most** (how much accuracy drops when a column is shuffled): the specific
-model matters most, then age and mileage, with make, drivetrain, body and fuel much smaller.
+model matters most, then age and mileage, then trim, with make, drivetrain, fuel and body
+much smaller.
 
 ### Reality check on a second dataset
 
@@ -75,21 +86,23 @@ The sweet spot is the **first age at which a car starts losing value more slowly
 python -m src.predict Toyota RAV4
 ```
 ```
-Toyota RAV4  (SUV, AWD/4WD, Gas)
-Based on 244 listings, 10,293 miles/year
+Toyota RAV4 XLE  (SUV, AWD/4WD, Gas)
+Based on 244 listings, 101 of them this trim, 10,293 miles/year
+Most common trim shown. Others: LE, XLE Premium, Limited, XSE, SE  (use --trim)
 
  Age     Miles      Value  % of new  Lost that year
-   0         0  $  50,414      100%
-   1    10,293  $  40,233       80%         $10,181
-   2    20,585  $  36,646       73%          $3,587  <- sweet spot
-   3    30,878  $  33,379       66%          $3,267
+   0         0  $  48,078      100%
+   1    10,293  $  38,541       80%          $9,537
+   2    20,585  $  35,315       73%          $3,227  <- sweet spot
+   3    30,878  $  32,358       67%          $2,957
    ...
 Keeping it 3 years, average value lost per year:
-  Buy new:            $5,678/yr
-  Buy 2 years old:    $2,984/yr  (saves $2,694/yr)
+  Buy new:            $5,240/yr
+  Buy 2 years old:    $2,716/yr  (saves $2,524/yr)
 ```
 
-Options: `--hold 5` (years you'll keep it), `--miles 15000` (miles you drive per year).
+Options: `--trim Limited` (a specific trim, default is the most common one),
+`--hold 5` (years you'll keep it), `--miles 15000` (miles you drive per year).
 
 ## Run the pipeline
 
@@ -138,9 +151,11 @@ reports/           Charts, findings and accuracy metrics (generated)
 - **One snapshot in time.** The curves compare *different* cars of different ages listed
   in the same month, not the same car followed over 10 years.
 - **New prices are today's prices.** A 2018 car cost less new than a 2026 one, so
-  long-term depreciation is somewhat overstated. Models with no new listings get an
-  estimated new price based on the typical 20% first-year drop.
-- **No trim level.** A base Camry and a top-trim Camry are treated the same, which is a
-  big source of the remaining error. Adding trim is the next improvement.
+  long-term depreciation is somewhat overstated.
+- **Trim names are messy.** Sellers type them freely ("AWD 2.5 S w/ Preferred Package"),
+  so rare spellings fall into an "Other" group. Rankings and charts use each model's most
+  common trim.
+- **New prices per trim are sparse.** Only 294 trims had new listings. For the rest, the new
+  price is estimated from the car's 1-year-old value and the typical 20% first-year drop.
 - **US data.** The pipeline is built so a different market (for example Ontario
   listings) could be swapped in through `download.py` and `clean.py`.
