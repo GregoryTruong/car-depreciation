@@ -94,7 +94,7 @@ Most common trim shown. Others: LE, XLE Premium, Limited, XSE, SE  (use --trim)
    0         0  $  47,856      100%
    1    10,293  $  38,521       80%          $9,335
    2    20,585  $  35,312       74%          $3,209  <- sweet spot
-   3    30,878  $  32,371       68%          $2,941
+   3    30,878  $  32,371       68%          $2,942
    ...
 Keeping it 3 years, average value lost per year:
   Buy new:            $5,162/yr
