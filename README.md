@@ -19,13 +19,13 @@ command-line tool to look up any car.
   its new price on average, so roughly 20% disappears in year one.
 - **Buying at the sweet spot cut the yearly cost of ownership roughly in half** for 5 of
   the 6 example models. For a
-  Toyota Camry kept 3 years, you'd lose about $4,500/year buying new vs. about
-  $2,400/year buying it 2 years old.
+  Toyota Camry kept 3 years, you'd lose about $4,400/year buying new vs. about
+  $2,300/year buying it 2 years old.
 - **Toyota holds value best.** Tacoma, Corolla and 4Runner keep 75-78% of their
-  value from year 1 to year 5. **Luxury SUVs lose the most**: a Porsche Macan or Cayenne
-  keeps 46%.
-- **Electric cars depreciate about the same as gas cars** (61% vs. 62% kept from year 1
-  to 5). Only 14 electric models had enough data, so this is a weak signal either way.
+  value from year 1 to year 5. **Luxury SUVs lose the most**: a Porsche Cayenne keeps 46%
+  and a BMW X5 47%.
+- **Electric cars depreciate a little faster than gas cars** (60% vs. 62% kept from year 1
+  to 5). Only 14 electric models had enough data, so this is a weak signal.
 
 ![Depreciation curves](reports/figures/example_curves.png)
 
@@ -43,10 +43,10 @@ mileage. Tested on 3,294 cars it never saw during training:
 |---|---|---|---|
 | Median guess (baseline) | $13,862 | 38.4% | -0.05 |
 | Linear regression (baseline) | $3,433 | 7.9% | 0.89 |
-| **Gradient boosting** | **$2,542** | **5.6%** | **0.93** |
+| **Gradient boosting** | **$2,530** | **5.6%** | **0.93** |
 
 Adding **trim level** (a base Camry LE vs. a sporty XSE, or an F150 XL vs. a Raptor) cut the
-average error by 28%, from $3,532 to $2,542, and put 47% of estimates inside Kelley Blue
+average error by 28%, from $3,532 to $2,530, and put 47% of estimates inside Kelley Blue
 Book's fair price range, up from 37%.
 
 Design choices:
@@ -54,9 +54,9 @@ Design choices:
   miss matters more on a $10,000 car than on an $80,000 one.
 - **Trim names are shared across brands.** "Limited" or "Platinum" means a well-equipped
   car at Toyota, Ford or Jeep, so the model learns from all of them. In a side-by-side test
-  this beat treating every model + trim pair as its own category ($2,508 vs. $2,950 average
-  error). Drivetrain and body words are stripped first, so "XLE AWD" and "XLE" are the same
-  trim.
+  this was more accurate than treating every model + trim pair as its own category.
+  Drivetrain and body words are stripped first, so "XLE AWD" and "XLE" are the same trim,
+  and listings with no real trim name ("AWD", "4MATIC Sedan", "Base") count as the base trim.
 - **Monotonic constraints:** value can only go *down* as age and mileage go up. Without
   this, noise could make a 6-year-old car "worth more" than a 5-year-old one.
 - **Smoothed curves:** each model's predictions are fit with a constant-percentage
@@ -91,17 +91,18 @@ Based on 244 listings, 101 of them this trim, 10,293 miles/year
 Most common trim shown. Others: LE, XLE Premium, Limited, XSE, SE  (use --trim)
 
  Age     Miles      Value  % of new  Lost that year
-   0         0  $  48,078      100%
-   1    10,293  $  38,541       80%          $9,537
-   2    20,585  $  35,315       73%          $3,227  <- sweet spot
-   3    30,878  $  32,358       67%          $2,957
+   0         0  $  47,856      100%
+   1    10,293  $  38,521       80%          $9,335
+   2    20,585  $  35,312       74%          $3,209  <- sweet spot
+   3    30,878  $  32,371       68%          $2,941
    ...
 Keeping it 3 years, average value lost per year:
-  Buy new:            $5,240/yr
-  Buy 2 years old:    $2,716/yr  (saves $2,524/yr)
+  Buy new:            $5,162/yr
+  Buy 2 years old:    $2,703/yr  (saves $2,458/yr)
 ```
 
-Options: `--trim Limited` (a specific trim, default is the most common one),
+Options: `--trim Limited` (a specific trim, default is the most common one; `--trim base`
+for listings without a named trim),
 `--hold 5` (years you'll keep it), `--miles 15000` (miles you drive per year).
 
 ## Run the pipeline
@@ -153,9 +154,9 @@ reports/           Charts, findings and accuracy metrics (generated)
 - **New prices are today's prices.** A 2018 car cost less new than a 2026 one, so
   long-term depreciation is somewhat overstated.
 - **Trim names are messy.** Sellers type them freely ("AWD 2.5 S w/ Preferred Package"),
-  so rare spellings fall into an "Other" group. Rankings and charts use each model's most
-  common trim.
-- **New prices per trim are sparse.** Only 294 trims had new listings. For the rest, the new
+  so rare spellings fall into an "Other" group, and "Base" also covers listings whose trim
+  wasn't given. Rankings and charts use each model's most common trim.
+- **New prices per trim are sparse.** Only 327 trims had new listings. For the rest, the new
   price is estimated from the car's 1-year-old value and the typical 20% first-year drop.
 - **US data.** The pipeline is built so a different market (for example Ontario
   listings) could be swapped in through `download.py` and `clean.py`.

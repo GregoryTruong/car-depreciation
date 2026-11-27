@@ -37,6 +37,7 @@ def prepare_features(cars: pd.DataFrame, known_models: set[str],
     A missing trim stays missing (the model treats it as its own category).
     """
     features = cars[FEATURES].copy()
+    features["trim"] = features["trim"].astype(object)  # an all-missing column could be float
     full_name = cars["make"] + " " + cars["model"]
     features.loc[~full_name.isin(known_models), "model"] = "Other"
     rare_trim = features["trim"].notna() & ~features["trim"].isin(known_trims)

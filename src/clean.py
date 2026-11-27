@@ -57,12 +57,18 @@ NOT_TRIM = re.compile(
 
 
 def simplify_trim(value) -> str | None:
-    """Trim name without drivetrain or body words ("XLE AWD" -> "XLE"). None if nothing is left."""
+    """Trim name without drivetrain or body words ("XLE AWD" -> "XLE").
+
+    None means base or unlisted: AutoTrader often lists a base car's trim as just "AWD"
+    or "4MATIC Sedan", and Marketcheck calls it "Base", so all of those become None.
+    """
     if not isinstance(value, str):
         return None
     text = NOT_TRIM.sub(" ", value)
     text = re.sub(r"\s+", " ", text).strip(" -")
-    return text or None
+    if text.lower() == "base" or not re.search(r"[A-Za-z0-9]", text):
+        return None
+    return text
 
 
 def simplify_fuel(value) -> str:
@@ -88,7 +94,8 @@ def clean_autotrader(raw: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     new = raw[(raw["listingType"] == "New") & (raw["msrp"] > 0)]
     new_prices = (
         new.assign(trim=new["trim"].map(simplify_trim))
-        .groupby(["makeName", "modelName", "trim"])["msrp"]
+        # dropna=False keeps base / unlisted trims (None), which are often the most common.
+        .groupby(["makeName", "modelName", "trim"], dropna=False)["msrp"]
         .agg(new_price="median", new_listings="count")
         .reset_index()
         .rename(columns={"makeName": "make", "modelName": "model"})

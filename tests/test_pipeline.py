@@ -34,6 +34,7 @@ def test_fuel_labels_from_both_sources_match(raw, expected):
     ("XLE", "XLE"), ("XLE AWD", "XLE"), ("SE Sedan 4D", "SE"), ("4MATIC Coupe", None),
     ("AWD 2.5 S", "2.5 S"), ("SH-AWD", "SH"), ("Unlimited Rubicon 4xe", "Unlimited Rubicon 4xe"),
     ("xDrive40i", "xDrive40i"), ("FWD", None), (None, None),
+    ("Base", None), ("4MATIC+", None),  # base trims and leftover symbols mean "no trim"
 ])
 def test_trim_drops_drivetrain_and_body_words(raw, expected):
     assert simplify_trim(raw) == expected
@@ -63,6 +64,15 @@ def test_rare_models_and_trims_become_other():
     # A missing trim stays missing instead of being lumped in with rare trims.
     assert features["trim"].tolist()[:2] == ["SE", "Other"]
     assert pd.isna(features["trim"].iloc[2])
+
+
+def test_features_handle_a_trim_column_with_no_trims_at_all():
+    cars = pd.DataFrame({
+        "make": ["Toyota"], "model": ["Camry"], "trim": [float("nan")], "body": ["Sedan"],
+        "drivetrain": ["FWD"], "fuel": ["Gas"], "age": [3], "mileage": [30e3],
+    })
+    features = prepare_features(cars, known_models={"Toyota Camry"}, known_trims={"SE"})
+    assert pd.isna(features["trim"].iloc[0])
 
 
 def test_sweet_spot_is_after_the_steep_early_drop():

@@ -73,8 +73,18 @@ def test_typical_specs_work_when_no_trim_is_recorded():
     assert typical_specs(listings, "Honda", "Civic")["trim"] is None
 
 
+def test_typical_specs_can_pick_the_base_trim_when_it_is_most_common():
+    # Two Civics: one without a listed trim, one EX. Add another base Civic so base wins.
+    listings = pd.concat([LISTINGS, LISTINGS.iloc[[4]]])
+    assert typical_specs(listings, "Honda", "Civic")["trim"] is None
+
+
 def test_find_trim_ignores_capitalization():
     assert find_trim(LISTINGS, "Toyota", "RAV4", "xle") == "XLE"
+
+
+def test_find_trim_base_means_no_listed_trim():
+    assert find_trim(LISTINGS, "Honda", "Civic", "base") is None
 
 
 def test_find_trim_lists_the_trims_it_does_have():
@@ -120,6 +130,19 @@ def test_new_price_is_estimated_when_there_are_no_new_listings():
     price, source = new_price_for(new_prices, curve, specs, first_year_share=0.8)
     assert price == pytest.approx(30_000)  # $24,000 at age 1 is 80% of $30,000
     assert "estimated" in source
+
+
+def test_base_trim_uses_the_base_trim_msrp():
+    new_prices = pd.DataFrame({"make": ["Honda", "Honda"], "model": ["Civic", "Civic"],
+                               "trim": [None, "EX"], "new_price": [25_000, 30_000]})
+    curve = pd.DataFrame({"age": [1, 2], "value": [20_000, 18_000]})
+    specs = {"make": "Honda", "model": "Civic", "trim": None}
+    assert new_price_for(new_prices, curve, specs, first_year_share=0.8)[0] == 25_000
+
+
+def test_value_curve_works_for_the_base_trim():
+    specs = typical_specs(LISTINGS, "Honda", "Civic", trim=None)
+    assert value_curve(BUNDLE, specs, yearly_miles=12_000)["value"].is_monotonic_decreasing
 
 
 def test_typical_first_year_value_compares_nearly_new_cars_to_msrp():
